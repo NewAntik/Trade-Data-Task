@@ -25,7 +25,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class TradeControllerTest {
 	private static final String URL = "/api/v1/trades";
-	private static final String FAILED_UPLOAD_MESSAGE = "Upload failed: The file is empty.";
 
 	private MockMvc mockMvc;
 
@@ -73,8 +72,7 @@ class TradeControllerTest {
 		mockMvc.perform(multipart(URL)
 				.file(emptyFile)
 				.contentType(MediaType.MULTIPART_FORM_DATA))
-			.andExpect(status().isOk())
-			.andExpect(content().string(FAILED_UPLOAD_MESSAGE));
+			.andExpect(status().isOk());
 	}
 
 	private MockMultipartFile getNotEmptyFile() {

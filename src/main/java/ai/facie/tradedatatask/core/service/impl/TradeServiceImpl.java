@@ -84,8 +84,14 @@ public class TradeServiceImpl implements TradeService {
 		final String[] parts = CSV_SPLIT_PATTERN.split(line);
 
 		if (parts.length == 4 && isValidDate(parts[0])) {
-			final String productName = productService.getProductName(Long.parseLong(parts[1]));
-			return parts[0] + "," + productName + "," + parts[2] + "," + parts[3];
+			try {
+				Long productId = Long.parseLong(parts[1]);  // Catch invalid IDs
+				String productName = productService.getProductName(productId);
+				return parts[0] + "," + productName + "," + parts[2] + "," + parts[3];
+			} catch (NumberFormatException e) {
+				log.warn("Skipping invalid product ID: {}", parts[1]);
+				return null;
+			}
 		} else {
 			log.warn(SKIPPING_MESSAGE, line);
 			return null;
