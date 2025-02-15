@@ -1,6 +1,5 @@
 package ai.facie.tradedatatask.controller;
 
-import ai.facie.tradedatatask.controller.util.ResponseFormatter;
 import ai.facie.tradedatatask.core.service.TradeService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +18,7 @@ import java.io.IOException;
 @AllArgsConstructor
 @RequestMapping("/api/v1/trades")
 public class TradeController {
+	public static final String TABLE_HEADER = "date,productName,currency,price\n";
 
 	private final TradeService tradeService;
 
@@ -35,10 +35,7 @@ public class TradeController {
 		log.info("Processing file reactively: {}", file.getOriginalFilename());
 		final Flux<String> treads = tradeService.enrichTradesStream(file.getInputStream());
 
-		return treads.collectList()
-			.flatMapMany(s -> {
-				final String formattedResponse = ResponseFormatter.format(s);
-				return Flux.just(formattedResponse);
-			});
+		return treads.map(trade -> trade + System.lineSeparator())
+			.startWith(TABLE_HEADER);
 	}
 }
