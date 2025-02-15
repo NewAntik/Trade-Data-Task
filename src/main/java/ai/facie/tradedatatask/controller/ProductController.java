@@ -15,7 +15,7 @@ import java.io.IOException;
 @Slf4j
 @RestController
 @AllArgsConstructor
-@RequestMapping("/api/v1/product")
+@RequestMapping("/api/v1/products")
 public class ProductController {
 
 	private final ProductService productService;
@@ -30,9 +30,9 @@ public class ProductController {
 	 * @return ResponseEntity with a success message or an error if the file is invalid.
 	 * @throws IOException if an error occurs while reading the file.
 	 */
-	@PostMapping(value = "/load-products", consumes = "multipart/form-data")
+	@PostMapping(consumes = "multipart/form-data")
 	public ResponseEntity<String> loadProducts(@RequestParam("file") final MultipartFile file) throws IOException {
-		log.info("loadProducts was called with file: {}", file.getOriginalFilename());
+		log.info("loadProducts was called with file name: {}", file.getOriginalFilename());
 
 		if (file.isEmpty()) {
 			return ResponseEntity.badRequest().body("Upload failed: The file is empty.");
