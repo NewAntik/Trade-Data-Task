@@ -1,0 +1,5 @@
+spring:
+  data:
+    redis:
+      port: ${SPRING_REDIS_PORT:6379}
+      host: ${SPRING_REDIS_HOST:redis}
