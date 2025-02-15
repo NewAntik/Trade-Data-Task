@@ -12,7 +12,4 @@ So for using this application follow these steps:
 Thank you for your time!
 I look forward to seeing you in a technical interview! 🎯🚀
 
-![Screenshot 2025-02-15 at 18.40.01.png](../../../var/folders/1k/3c4m9dv526sgfslfws57yzb80000gn/T/TemporaryItems/NSIRD_screencaptureui_FPxTWK/Screenshot%202025-02-15%20at%2018.40.01.png)
-
-
-
+![Tests](https://drive.google.com/file/d/1XV0fllxEO8gPSIVE7aA3QVtjCNUMmt4o/view?usp=sharing)
