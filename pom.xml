@@ -73,6 +73,11 @@
             <version>0.7.3</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-core</artifactId>
+            <version>3.7.3</version>
+        </dependency>
     </dependencies>
 
     <build>

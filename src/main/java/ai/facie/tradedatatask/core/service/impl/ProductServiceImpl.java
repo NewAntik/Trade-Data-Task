@@ -29,7 +29,7 @@ public class ProductServiceImpl implements ProductService {
 	 */
 	@Override
 	public void loadProductsFromStream(final InputStream stream) {
-		log.info("loadProductsFromCSV was called with file: {}", stream);
+		log.info("loadProductsFromCSV was called");
 
 		final BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
 		reader.lines().skip(START_LINE).forEach(this::populateCache);
