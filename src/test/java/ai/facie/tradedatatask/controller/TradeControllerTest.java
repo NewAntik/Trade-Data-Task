@@ -1,9 +1,5 @@
 package ai.facie.tradedatatask.controller;
 
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 import ai.facie.tradedatatask.core.service.TradeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,13 +13,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import reactor.core.publisher.Flux;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class TradeControllerTest {
@@ -67,7 +64,7 @@ class TradeControllerTest {
 
 	/**
 	 * Test case: Uploading an empty file.
-	 * Expected: Returns `400 Bad Request` with appropriate message.
+	 * Expected: Returns `200` with appropriate failed message.
 	 */
 	@Test
 	void testEnrichTrades_EmptyFile() throws Exception {
