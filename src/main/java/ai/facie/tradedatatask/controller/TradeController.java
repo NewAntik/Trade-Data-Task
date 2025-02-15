@@ -4,6 +4,7 @@ import ai.facie.tradedatatask.core.service.TradeService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -33,6 +34,9 @@ public class TradeController {
 	@PostMapping(consumes = "multipart/form-data", produces = MediaType.TEXT_PLAIN_VALUE)
 	public Flux<String> enrichTrades(@RequestParam("file") MultipartFile file) throws IOException {
 		log.info("Processing file reactively: {}", file.getOriginalFilename());
+		if (file.isEmpty()) {
+			return Flux.just("Upload failed: The file is empty.");
+		}
 		final Flux<String> treads = tradeService.enrichTradesStream(file.getInputStream());
 
 		return treads.map(trade -> trade + System.lineSeparator())
