@@ -1,7 +1,10 @@
 Hello!
 In my solution I implemented all steps.
+If I had more time, I’d investigate how to implement a reactive approach using best practices.
+
 
 So for using this application follow these steps:
+
 1. Open project folder and run "mvn clean compile package"
 2. Go to docker folder.
 3. Run docker compose using this command "docker-compose up -d"
