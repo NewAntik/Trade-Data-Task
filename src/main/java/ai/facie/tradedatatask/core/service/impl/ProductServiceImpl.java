@@ -57,7 +57,7 @@ public class ProductServiceImpl implements ProductService {
 				try {
 					reader.close();
 				} catch (Exception e) {
-					log.error("❌ Error closing reader", e);
+					log.error("Error closing reader", e);
 				}
 			})
 		).blockLast();
