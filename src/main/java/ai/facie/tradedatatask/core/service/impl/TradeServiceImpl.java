@@ -3,6 +3,7 @@ package ai.facie.tradedatatask.core.service.impl;
 import ai.facie.tradedatatask.core.service.ProductService;
 import ai.facie.tradedatatask.core.service.TradeService;
 import lombok.AllArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -10,11 +11,13 @@ import reactor.core.publisher.FluxSink;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -26,6 +29,7 @@ public class TradeServiceImpl implements TradeService {
 	private static final String DATE_TIME_FORMAT = "yyyyMMdd";
 	private static final String SKIPPING_MESSAGE = "Skipping invalid trade record: {}";
 	private static final Pattern CSV_SPLIT_PATTERN = Pattern.compile(",");
+	private static final int BATCH_SIZE = 1000;
 
 	private final ProductService productService;
 
@@ -39,63 +43,69 @@ public class TradeServiceImpl implements TradeService {
 	 *
 	 * @return A {@link Flux} that emits enriched trade records as a stream.
 	 */
+	@SneakyThrows
 	@Override
 	public Flux<String> enrichTradesStream(final InputStream stream) {
-		return Flux.<String>create(sink -> enrichTrades(sink, stream))
-			.parallel()
-			.runOn(Schedulers.boundedElastic())
-			.sequential();
-	}
-
-	/**
-	 * Streams trade data reactively by processing lines from an input stream in parallel.
-	 *
-	 * <p>Reads trade records line by line, validates, enriches, and emits each valid trade.
-	 * Skips invalid records. Marks stream as complete or emits error in case of failure.</p>
-	 *
-	 * @param sink The {@link FluxSink} used to emit trade records reactively.
-	 * @param stream The input stream containing trade data.
-	 */
-	private void enrichTrades(final FluxSink<String> sink, final InputStream stream) {
-		try (final BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
-			reader.lines()
-				.skip(START_LINE)
+		return Flux.using(
+			() -> new BufferedReader(new InputStreamReader(stream)),
+			reader -> Flux.fromStream(reader.lines().skip(START_LINE))
 				.parallel()
-				.map(this::enrichTrade)
+				.runOn(Schedulers.boundedElastic())
+				.map(this::parseTrade)
 				.filter(Objects::nonNull)
-				.forEach(sink::next);
-
-			sink.complete();
-		} catch (Exception e) {
-			sink.error(new RuntimeException("Error processing trade file", e));
-		}
+				.sequential()
+				.buffer(BATCH_SIZE)
+				.flatMap(this::fetchProductNamesInBatch),
+			reader -> {
+				try {
+					reader.close();
+				} catch (IOException e) {
+					throw new RuntimeException("Error closing BufferedReader", e);
+				}
+			}
+		);
 	}
 
 	/**
-	 * Converts a CSV line into a trade string, handling validation and enrichment.
+	 * Parses a trade CSV line and extracts the trade details.
 	 *
-	 * <p>This method is now thread-safe and optimized for parallel execution.</p>
-	 *
-	 * @param line A single line from the file.
-	 *
-	 * @return A formatted string representation of the trade if valid, otherwise null.
+	 * @param line A single line from the trade CSV.
+	 * @return A parsed TradeRecord or null if invalid.
 	 */
-	private String enrichTrade(final String line) {
-		final String[] parts = CSV_SPLIT_PATTERN.split(line);
+	private TradeRecord parseTrade(final String line) {
+		String[] parts = CSV_SPLIT_PATTERN.split(line);
 
 		if (parts.length == 4 && isValidDate(parts[0])) {
 			try {
-				Long productId = Long.parseLong(parts[1]);  // Catch invalid IDs
-				String productName = productService.getProductName(productId);
-				return parts[0] + "," + productName + "," + parts[2] + "," + parts[3];
+				return new TradeRecord(parts[0], Long.parseLong(parts[1]), parts[2], parts[3]);
 			} catch (NumberFormatException e) {
 				log.warn("Skipping invalid product ID: {}", parts[1]);
-				return null;
 			}
 		} else {
 			log.warn(SKIPPING_MESSAGE, line);
-			return null;
 		}
+		return null;
+	}
+
+	/**
+	 * Fetches product names in batch from Redis, reducing the number of calls.
+	 *
+	 * @param batch List of trade records.
+	 * @return Flux<String> containing enriched trade records.
+	 */
+	private Flux<String> fetchProductNamesInBatch(List<TradeRecord> batch) {
+		List<String> productIds = batch.stream()
+			.map(trade -> String.valueOf(trade.productId()))
+			.toList();
+
+
+		List<String> productNames = productService.getProductNamesInBatch(productIds);
+
+		return Flux.fromIterable(batch)
+			.map(trade -> {
+				String productName = productNames.get(batch.indexOf(trade));
+				return trade.date() + "," + productName + "," + trade.currency() + "," + trade.price();
+			});
 	}
 
 	/**
@@ -113,4 +123,9 @@ public class TradeServiceImpl implements TradeService {
 			return false;
 		}
 	}
+
+	/**
+	 * Represents a parsed trade record.
+	 */
+	private record TradeRecord(String date, Long productId, String currency, String price) {}
 }

@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -70,5 +73,30 @@ public class ProductServiceImpl implements ProductService {
 		} else {
 			log.warn("Skipping invalid product record: {}", line);
 		}
+	}
+
+	/**
+	 * Retrieves product names from Redis in batch.
+	 *
+	 * <p>If a product ID is not found, it returns "Missing Product Name".</p>
+	 *
+	 * @param productIds List of product IDs.
+	 * @return List of product names in the same order.
+	 */
+	@Override
+	public List<String> getProductNamesInBatch(final List<String> productIds) {
+		List<String> productNames = redisTemplate.opsForValue().multiGet(productIds);
+
+		if (productNames == null) {
+			productNames = new ArrayList<>(Collections.nCopies(productIds.size(), MISSING_PRODUCT_NAME));
+		} else {
+			for (int i = 0; i < productNames.size(); i++) {
+				if (productNames.get(i) == null) {
+					productNames.set(i, MISSING_PRODUCT_NAME);
+				}
+			}
+		}
+
+		return productNames;
 	}
 }

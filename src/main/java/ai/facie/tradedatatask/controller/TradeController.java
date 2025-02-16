@@ -4,7 +4,6 @@ import ai.facie.tradedatatask.core.service.TradeService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,9 +36,15 @@ public class TradeController {
 		if (file.isEmpty()) {
 			return Flux.just("Upload failed: The file is empty.");
 		}
+
 		final Flux<String> treads = tradeService.enrichTradesStream(file.getInputStream());
+		final long startTime = System.currentTimeMillis();
 
 		return treads.map(trade -> trade + System.lineSeparator())
-			.startWith(TABLE_HEADER);
+			.startWith(TABLE_HEADER)
+			.doOnComplete(() -> {
+				long endTime = System.currentTimeMillis();
+				log.info("Trade processing completed in {} ms", (endTime - startTime));
+			});
 	}
 }
