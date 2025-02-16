@@ -7,7 +7,5 @@ public interface ProductService {
 
 	void loadProductsFromStream(InputStream stream);
 
-	String getProductName(Long productId);
-
 	List<String> getProductNamesInBatch(List<String> productIds);
 }
