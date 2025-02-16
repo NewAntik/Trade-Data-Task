@@ -43,8 +43,8 @@ public class TradeServiceImpl implements TradeService {
 	 *
 	 * @return A {@link Flux} that emits enriched trade records as a stream.
 	 */
-	@SneakyThrows
 	@Override
+	@SneakyThrows
 	public Flux<String> enrichTradesStream(final InputStream stream) {
 		return Flux.using(
 			() -> new BufferedReader(new InputStreamReader(stream)),
@@ -58,11 +58,13 @@ public class TradeServiceImpl implements TradeService {
 				.flatMap(this::fetchProductNamesInBatch)
 				.startWith(TABLE_HEADER),
 			reader -> {
-				try {
-					reader.close();
-				} catch (IOException e) {
-					throw new RuntimeException("Error closing BufferedReader", e);
-				}
+				Schedulers.boundedElastic().schedule(() -> {
+					try {
+						reader.close();
+					} catch (final IOException e) {
+						log.error("Error closing BufferedReader", e);
+					}
+				});
 			}
 		);
 	}

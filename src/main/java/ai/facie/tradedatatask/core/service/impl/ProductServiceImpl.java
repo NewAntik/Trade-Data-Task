@@ -40,7 +40,7 @@ public class ProductServiceImpl implements ProductService {
 	 */
 	@Override
 	public void loadProductsFromStream(final InputStream stream) {
-		log.info("🚀 Starting to load products into Redis...");
+		log.info("loadProductsFromStream was called!");
 
 		Flux.using(
 			() -> new BufferedReader(new InputStreamReader(stream)),
