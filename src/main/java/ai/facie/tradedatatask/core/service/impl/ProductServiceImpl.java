@@ -53,15 +53,13 @@ public class ProductServiceImpl implements ProductService {
 				.buffer(BATCH_SIZE)
 				.doOnNext(this::batchInsertToRedis)
 				.doOnComplete(() -> log.info("Finished loading products into Redis.")),
-			reader -> {
-				Schedulers.boundedElastic().schedule(() -> {
-					try {
-						reader.close();
-					} catch (Exception e) {
-						log.error("❌ Error closing reader", e);
-					}
-				});
-			}
+			reader -> Schedulers.boundedElastic().schedule(() -> {
+				try {
+					reader.close();
+				} catch (Exception e) {
+					log.error("❌ Error closing reader", e);
+				}
+			})
 		).blockLast();
 	}
 
