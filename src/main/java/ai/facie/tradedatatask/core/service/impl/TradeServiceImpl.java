@@ -30,6 +30,7 @@ public class TradeServiceImpl implements TradeService {
 	private static final String SKIPPING_MESSAGE = "Skipping invalid trade record: {}";
 	private static final Pattern CSV_SPLIT_PATTERN = Pattern.compile(",");
 	private static final int BATCH_SIZE = 1000;
+	public static final String TABLE_HEADER = "date,productName,currency,price\n";
 
 	private final ProductService productService;
 
@@ -47,15 +48,16 @@ public class TradeServiceImpl implements TradeService {
 	@Override
 	public Flux<String> enrichTradesStream(final InputStream stream) {
 		return Flux.using(
-			() -> new BufferedReader(new InputStreamReader(stream)),
-			reader -> Flux.fromStream(reader.lines().skip(START_LINE))
+			() -> new BufferedReader(new InputStreamReader(stream)), // ✅ Efficient file reading
+			reader -> Flux.fromStream(reader.lines().skip(START_LINE)) // ✅ Skip header line
 				.parallel()
-				.runOn(Schedulers.boundedElastic())
+				.runOn(Schedulers.boundedElastic()) // ✅ Multi-threaded execution
 				.map(this::parseTrade)
 				.filter(Objects::nonNull)
 				.sequential()
-				.buffer(BATCH_SIZE)
-				.flatMap(this::fetchProductNamesInBatch),
+				.buffer(BATCH_SIZE) // ✅ Batch processing for Redis
+				.flatMap(this::fetchProductNamesInBatch)
+				.startWith(TABLE_HEADER), // ✅ Prepend header in service layer
 			reader -> {
 				try {
 					reader.close();
@@ -90,22 +92,26 @@ public class TradeServiceImpl implements TradeService {
 	/**
 	 * Fetches product names in batch from Redis, reducing the number of calls.
 	 *
+	 * <p>Formats each trade record with a newline separator in parallel before returning.</p>
+	 *
 	 * @param batch List of trade records.
-	 * @return Flux<String> containing enriched trade records.
+	 * @return Flux<String> containing enriched trade records with newlines.
 	 */
 	private Flux<String> fetchProductNamesInBatch(List<TradeRecord> batch) {
 		List<String> productIds = batch.stream()
 			.map(trade -> String.valueOf(trade.productId()))
 			.toList();
 
-
 		List<String> productNames = productService.getProductNamesInBatch(productIds);
 
 		return Flux.fromIterable(batch)
+			.parallel()
+			.runOn(Schedulers.parallel()) // ✅ Multi-threaded formatting
 			.map(trade -> {
 				String productName = productNames.get(batch.indexOf(trade));
-				return trade.date() + "," + productName + "," + trade.currency() + "," + trade.price();
-			});
+				return trade.date() + "," + productName + "," + trade.currency() + "," + trade.price() + System.lineSeparator();
+			})
+			.sequential();
 	}
 
 	/**

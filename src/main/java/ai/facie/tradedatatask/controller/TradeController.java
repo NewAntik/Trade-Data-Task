@@ -18,7 +18,6 @@ import java.io.IOException;
 @AllArgsConstructor
 @RequestMapping("/api/v1/trades")
 public class TradeController {
-	public static final String TABLE_HEADER = "date,productName,currency,price\n";
 
 	private final TradeService tradeService;
 
@@ -33,15 +32,14 @@ public class TradeController {
 	@PostMapping(consumes = "multipart/form-data", produces = MediaType.TEXT_PLAIN_VALUE)
 	public Flux<String> enrichTrades(@RequestParam("file") MultipartFile file) throws IOException {
 		log.info("Processing file reactively: {}", file.getOriginalFilename());
+
 		if (file.isEmpty()) {
 			return Flux.just("Upload failed: The file is empty.");
 		}
 
-		final Flux<String> treads = tradeService.enrichTradesStream(file.getInputStream());
 		final long startTime = System.currentTimeMillis();
 
-		return treads.map(trade -> trade + System.lineSeparator())
-			.startWith(TABLE_HEADER)
+		return tradeService.enrichTradesStream(file.getInputStream())
 			.doOnComplete(() -> {
 				long endTime = System.currentTimeMillis();
 				log.info("Trade processing completed in {} ms", (endTime - startTime));
