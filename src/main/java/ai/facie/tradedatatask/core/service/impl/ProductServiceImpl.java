@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -12,6 +14,9 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -19,60 +24,73 @@ import java.util.List;
 public class ProductServiceImpl implements ProductService {
 	private static final String MISSING_PRODUCT_NAME = "Missing Product Name";
 	private static final int START_LINE = 1;
+	private static final int BATCH_SIZE = 1000;
 
 	private final RedisTemplate<String, String> redisTemplate;
 
 	/**
-	 * Loads product data from an input stream (CSV file) and stores it in Redis.
+	 * Loads product data from an input stream (CSV file) and stores it in Redis **efficiently**.
 	 *
-	 * <p>This method reads product records from the provided input stream, skipping the first line
-	 * (header), and then processes each line to store product ID and product name in Redis.
+	 * <p>This method now:
+	 * - Reads the file **in parallel** using Reactor.
+	 * - **Batches inserts** to Redis for better performance.
+	 * - Uses **efficient memory management**.</p>
 	 *
 	 * @param stream The input stream containing product data in CSV format.
 	 */
 	@Override
 	public void loadProductsFromStream(final InputStream stream) {
-		log.info("loadProductsFromCSV was called");
+		log.info("loadProductsFromStream was called");
 
-		final BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
-		reader.lines().skip(START_LINE).forEach(this::populateCache);
-
-		log.info("Successfully loaded product data into Redis.");
+		Flux.using(
+			() -> new BufferedReader(new InputStreamReader(stream)),
+			reader -> Flux.fromStream(reader.lines().skip(START_LINE))
+				.parallel()
+				.runOn(Schedulers.boundedElastic())
+				.map(this::parseProduct)
+				.filter(Objects::nonNull)
+				.sequential()
+				.buffer(BATCH_SIZE)
+				.doOnNext(this::batchInsertToRedis)
+				.doOnComplete(() -> log.info("Finished loading products into Redis.")),
+			reader -> {
+				try {
+					reader.close();
+				} catch (Exception e) {
+					log.error("Error closing reader", e);
+				}
+			}
+		).blockLast();
 	}
 
 	/**
-	 * Retrieves the product name from Redis based on the provided product ID.
+	 * Parses a product record from a line.
 	 *
-	 * <p>If the product ID exists in Redis, the corresponding product name is returned.
-	 * Otherwise, it returns a default value: {@code "Missing Product Name"}.
-	 *
-	 * @param productId The ID of the product to look up.
-	 * @return The corresponding product name if found, otherwise {@code "Missing Product Name"}.
+	 * @param line A single line from the file.
+	 * @return A key-value pair (productId -> productName) or null if invalid.
 	 */
-	@Override
-	public String getProductName(final Long productId) {
-		log.info("getProductName was called with product id: {}", productId);
-
-		final String productName = redisTemplate.opsForValue().get(String.valueOf(productId));
-
-		return productName != null ? productName : MISSING_PRODUCT_NAME;
-	}
-
-	/**
-	 * Stores a product entry in Redis after validating the input CSV record.
-	 *
-	 * <p>This method processes a single line of the CSV file, extracting the product ID and
-	 * product name. If the line does not contain exactly two elements, it is skipped and logged as a warning.
-	 *
-	 * @param line A single line from the product CSV file (excluding the header).
-	 */
-	private void populateCache(final String line) {
+	private Map.Entry<String, String> parseProduct(final String line) {
 		final String[] parts = line.split(",");
 		if (parts.length == 2) {
-			redisTemplate.opsForValue().set(parts[0], parts[1]);
+			return Map.entry(parts[0], parts[1]);
 		} else {
 			log.warn("Skipping invalid product record: {}", line);
+			return null;
 		}
+	}
+
+	/**
+	 * Stores product entries in Redis **in batch**.
+	 *
+	 * <p>Uses **pipeline** to reduce the number of calls to Redis.</p>
+	 *
+	 * @param batch List of product records (productId -> productName).
+	 */
+	private void batchInsertToRedis(final List<Map.Entry<String, String>> batch) {
+		final Map<String, String> productMap = batch.stream()
+			.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+		redisTemplate.opsForValue().multiSet(productMap);
 	}
 
 	/**
