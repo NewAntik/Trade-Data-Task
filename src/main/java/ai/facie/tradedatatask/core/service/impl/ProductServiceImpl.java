@@ -40,7 +40,7 @@ public class ProductServiceImpl implements ProductService {
 	 */
 	@Override
 	public void loadProductsFromStream(final InputStream stream) {
-		log.info("loadProductsFromStream was called");
+		log.info("🚀 Starting to load products into Redis...");
 
 		Flux.using(
 			() -> new BufferedReader(new InputStreamReader(stream)),
@@ -54,11 +54,13 @@ public class ProductServiceImpl implements ProductService {
 				.doOnNext(this::batchInsertToRedis)
 				.doOnComplete(() -> log.info("Finished loading products into Redis.")),
 			reader -> {
-				try {
-					reader.close();
-				} catch (Exception e) {
-					log.error("Error closing reader", e);
-				}
+				Schedulers.boundedElastic().schedule(() -> {
+					try {
+						reader.close();
+					} catch (Exception e) {
+						log.error("❌ Error closing reader", e);
+					}
+				});
 			}
 		).blockLast();
 	}
