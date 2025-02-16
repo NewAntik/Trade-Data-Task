@@ -13,7 +13,11 @@ So for using this application follow these steps:
 6. After step 5 run command "curl -F "file=@trade.csv" http://localhost:8080/api/v1/trades" to process the trades.
 
 
-Tests screenshot - https://drive.google.com/file/d/1XV0fllxEO8gPSIVE7aA3QVtjCNUMmt4o/view?usp=sharing
+I've tested the program using product.csv file(2,2 MB) and trade.csv file(4,2mb)
+As results:
+1. upload the product file - 478 ms.
+2. process the trade file - 1440 ms(first try), 1001 ms(second try), 953ms(third try).
+
 
 Thank you for your time!
 I look forward to seeing you in a technical interview! 🎯🚀
