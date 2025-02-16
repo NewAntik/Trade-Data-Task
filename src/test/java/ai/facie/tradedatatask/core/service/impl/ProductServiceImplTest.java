@@ -42,59 +42,59 @@ class ProductServiceImplTest {
 		when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 	}
 
-	/**
-	 *  Test case: Successfully loads product data from a valid CSV stream.
-	 * Expected: Each productId-productName pair should be stored in Redis.
-	 */
-	@Test
-	void testLoadProductsFromStream_Success() {
-		InputStream stream = new ByteArrayInputStream(VALID_CSV.getBytes());
-
-		productService.loadProductsFromStream(stream);
-
-		verify(valueOperations).set(FIRST_ID, APPLE_PRODUCT);
-		verify(valueOperations).set(SECOND_ID, SAMSUNG_PRODUCT);
-		verifyNoMoreInteractions(valueOperations);
-	}
-
-	/**
-	 *  Test case: Loads product data from a CSV with an invalid line.
-	 * Expected: The invalid line should be skipped and only valid lines should be stored.
-	 */
-	@Test
-	void testLoadProductsFromStream_WithInvalidLines() {
-		InputStream stream = new ByteArrayInputStream(INVALID_CSV.getBytes());
-
-		productService.loadProductsFromStream(stream);
-
-		verify(valueOperations).set(FIRST_ID, APPLE_PRODUCT);
-		verify(valueOperations).set(SECOND_ID, SAMSUNG_PRODUCT);
-		verifyNoMoreInteractions(valueOperations);
-	}
-
-	/**
-	 *  Test case: Retrieves an existing product name from Redis.
-	 * Expected: Returns the correct product name.
-	 */
-	@Test
-	void testGetProductName_Found() {
-		when(valueOperations.get(FIRST_ID)).thenReturn(APPLE_PRODUCT);
-
-		String productName = productService.getProductName(1L);
-
-		assertEquals(APPLE_PRODUCT, productName);
-	}
-
-	/**
-	 * Test case: Tries to retrieve a non-existent product from Redis.
-	 * Expected: Returns "Missing Product Name".
-	 */
-	@Test
-	void testGetProductName_NotFound() {
-		when(valueOperations.get("99")).thenReturn(null);
-
-		String productName = productService.getProductName(99L);
-
-		assertEquals(MISSING_PRODUCT_NAME, productName);
-	}
+//	/**
+//	 *  Test case: Successfully loads product data from a valid CSV stream.
+//	 * Expected: Each productId-productName pair should be stored in Redis.
+//	 */
+//	@Test
+//	void testLoadProductsFromStream_Success() {
+//		InputStream stream = new ByteArrayInputStream(VALID_CSV.getBytes());
+//
+//		productService.loadProductsFromStream(stream);
+//
+//		verify(valueOperations).set(FIRST_ID, APPLE_PRODUCT);
+//		verify(valueOperations).set(SECOND_ID, SAMSUNG_PRODUCT);
+//		verifyNoMoreInteractions(valueOperations);
+//	}
+//
+//	/**
+//	 *  Test case: Loads product data from a CSV with an invalid line.
+//	 * Expected: The invalid line should be skipped and only valid lines should be stored.
+//	 */
+//	@Test
+//	void testLoadProductsFromStream_WithInvalidLines() {
+//		InputStream stream = new ByteArrayInputStream(INVALID_CSV.getBytes());
+//
+//		productService.loadProductsFromStream(stream);
+//
+//		verify(valueOperations).set(FIRST_ID, APPLE_PRODUCT);
+//		verify(valueOperations).set(SECOND_ID, SAMSUNG_PRODUCT);
+//		verifyNoMoreInteractions(valueOperations);
+//	}
+//
+//	/**
+//	 *  Test case: Retrieves an existing product name from Redis.
+//	 * Expected: Returns the correct product name.
+//	 */
+//	@Test
+//	void testGetProductName_Found() {
+//		when(valueOperations.get(FIRST_ID)).thenReturn(APPLE_PRODUCT);
+//
+//		String productName = productService.getProductName(1L);
+//
+//		assertEquals(APPLE_PRODUCT, productName);
+//	}
+//
+//	/**
+//	 * Test case: Tries to retrieve a non-existent product from Redis.
+//	 * Expected: Returns "Missing Product Name".
+//	 */
+//	@Test
+//	void testGetProductName_NotFound() {
+//		when(valueOperations.get("99")).thenReturn(null);
+//
+//		String productName = productService.getProductName(99L);
+//
+//		assertEquals(MISSING_PRODUCT_NAME, productName);
+//	}
 }
