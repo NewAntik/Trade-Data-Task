@@ -29,6 +29,11 @@ public class ProductServiceImpl implements ProductService {
 
 	private final RedisTemplate<String, String> redisTemplate;
 
+	/**
+	 * Loads product data from an input stream and processes it asynchronously.
+	 *
+	 * @param stream The input stream containing product data.
+	 */
 	@Override
 	public void loadProductsFromStream(final InputStream stream) {
 		log.info("Starting to load products from stream.");
@@ -40,7 +45,26 @@ public class ProductServiceImpl implements ProductService {
 		}
 	}
 
-	private void processProductStream(BufferedReader reader) {
+	/**
+	 * Retrieves product names from Redis for the given list of product IDs.
+	 * If a product ID is not found, it is replaced with a placeholder.
+	 *
+	 * @param productIds List of product IDs to fetch names for.
+	 * @return List of product names corresponding to the given IDs.
+	 */
+	@Override
+	public List<String> getProductNamesInBatch(final List<String> productIds) {
+		final List<String> productNames = fetchProductNamesFromRedis(productIds);
+
+		return replaceMissingProductNames(productIds, productNames);
+	}
+
+	/**
+	 * Processes the input streamline by line, parses product data, and stores it in Redis in batches.
+	 *
+	 * @param reader BufferedReader reading the input stream.
+	 */
+	private void processProductStream(final BufferedReader reader) {
 		Flux.fromStream(reader.lines().skip(START_LINE))
 			.parallel()
 			.runOn(Schedulers.boundedElastic())
@@ -52,8 +76,14 @@ public class ProductServiceImpl implements ProductService {
 			.blockLast();
 	}
 
+	/**
+	 * Parses a single line from the input stream into a key-value product entry.
+	 *
+	 * @param line A line containing product.
+	 * @return A map entry with product ID as key and product name as value, or null if invalid.
+	 */
 	private Map.Entry<String, String> parseProduct(final String line) {
-		String[] parts = line.split(",");
+		final String[] parts = line.split(",");
 		if (parts.length == 2) {
 			return Map.entry(parts[0], parts[1]);
 		} else {
@@ -62,23 +92,35 @@ public class ProductServiceImpl implements ProductService {
 		}
 	}
 
+	/**
+	 * Stores a batch of product entries into Redis.
+	 *
+	 * @param batch List of product entries to be inserted.
+	 */
 	private void batchInsertToRedis(final List<Map.Entry<String, String>> batch) {
-		Map<String, String> productMap = batch.stream()
+		final Map<String, String> productMap = batch.stream()
 			.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 		redisTemplate.opsForValue().multiSet(productMap);
 	}
 
-	@Override
-	public List<String> getProductNamesInBatch(final List<String> productIds) {
-		List<String> productNames = fetchProductNamesFromRedis(productIds);
-		return replaceMissingProductNames(productIds, productNames);
-	}
-
-	private List<String> fetchProductNamesFromRedis(List<String> productIds) {
+	/**
+	 * Fetches product names from Redis based on a list of product IDs.
+	 *
+	 * @param productIds List of product IDs.
+	 * @return List of product names retrieved from Redis.
+	 */
+	private List<String> fetchProductNamesFromRedis(final List<String> productIds) {
 		return redisTemplate.opsForValue().multiGet(productIds);
 	}
 
-	private List<String> replaceMissingProductNames(List<String> productIds, List<String> productNames) {
+	/**
+	 * Replaces missing product names with a default placeholder.
+	 *
+	 * @param productIds List of product IDs.
+	 * @param productNames List of product names retrieved from Redis.
+	 * @return List of product names with missing values replaced.
+	 */
+	private List<String> replaceMissingProductNames(final List<String> productIds, final List<String> productNames) {
 		if (productNames == null) {
 			return new ArrayList<>(Collections.nCopies(productIds.size(), MISSING_PRODUCT_NAME));
 		}
