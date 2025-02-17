@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 
 @Slf4j
 @RestController
@@ -37,7 +39,11 @@ public class ProductController {
 		if (file.isEmpty()) {
 			return ResponseEntity.badRequest().body("Upload failed: The file is empty.");
 		}
+		final Instant start = Instant.now();
+		productService.loadProductsFromStream(file.getInputStream());
+		final Instant end = Instant.now();
 
+		log.info("File processing completed in {} ms", Duration.between(start, end).toMillis());
 		productService.loadProductsFromStream(file.getInputStream());
 
 		return ResponseEntity.ok("Product data loaded successfully into Redis.");
