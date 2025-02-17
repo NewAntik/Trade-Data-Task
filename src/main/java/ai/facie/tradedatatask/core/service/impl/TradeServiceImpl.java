@@ -37,64 +37,84 @@ public class TradeServiceImpl implements TradeService {
 	@SneakyThrows
 	public Flux<String> enrichTradesStream(final InputStream stream) {
 		return Flux.using(
-			() -> new BufferedReader(new InputStreamReader(stream)),
-			reader -> Flux.fromStream(reader.lines().skip(START_LINE))
-				.parallel()
-				.runOn(Schedulers.boundedElastic())
-				.map(this::parseTrade)
-				.filter(Objects::nonNull)
-				.sequential()
-				.buffer(BATCH_SIZE)
-				.flatMap(this::fetchProductNamesInBatch)
-				.startWith(TABLE_HEADER),
-			reader -> {
-				Schedulers.boundedElastic().schedule(() -> {
-					try {
-						reader.close();
-					} catch (final IOException e) {
-						log.error("Error closing BufferedReader", e);
-					}
-				});
-			}
+			() -> createBufferedReader(stream),
+			this::processTradeStream,
+			this::closeBufferedReader
 		);
+	}
+
+	private BufferedReader createBufferedReader(final InputStream stream) {
+		return new BufferedReader(new InputStreamReader(stream));
+	}
+
+	private Flux<String> processTradeStream(final BufferedReader reader) {
+		return Flux.fromStream(reader.lines().skip(START_LINE))
+			.parallel()
+			.runOn(Schedulers.boundedElastic())
+			.map(this::parseTrade)
+			.filter(Objects::nonNull)
+			.sequential()
+			.buffer(BATCH_SIZE)
+			.flatMap(this::fetchProductNamesInBatch)
+			.startWith(TABLE_HEADER);
+	}
+
+	private void closeBufferedReader(final BufferedReader reader) {
+		Schedulers.boundedElastic().schedule(() -> {
+			try {
+				reader.close();
+			} catch (final IOException e) {
+				log.error("Error closing BufferedReader", e);
+			}
+		});
 	}
 
 	private TradeRecord parseTrade(final String line) {
 		final String[] parts = CSV_SPLIT_PATTERN.split(line);
-
-		if (parts.length == 4 && isValidDate(parts[0])) {
-			try {
-				return new TradeRecord(parts[0], Long.parseLong(parts[1]), parts[2], parts[3]);
-			} catch (NumberFormatException e) {
-				log.warn("Skipping invalid product ID: {}", parts[1]);
-			}
-		} else {
-			log.warn(SKIPPING_MESSAGE, line);
+		if (isValidTradeRecord(parts)) {
+			return createTradeRecord(parts);
 		}
+		log.warn(SKIPPING_MESSAGE, line);
+
 		return null;
 	}
 
-	private Flux<String> fetchProductNamesInBatch(final List<TradeRecord> batch) {
-		final List<String> productIds = batch.stream()
-			.map(trade -> String.valueOf(trade.productId()))
-			.toList();
+	private boolean isValidTradeRecord(final String[] parts) {
+		return parts.length == 4 && isValidDate(parts[0]);
+	}
 
+	private TradeRecord createTradeRecord(final String[] parts) {
+		try {
+			return new TradeRecord(parts[0], Long.parseLong(parts[1]), parts[2], parts[3]);
+		} catch (NumberFormatException e) {
+			log.warn("Skipping invalid product ID: {}", parts[1]);
+
+			return null;
+		}
+	}
+
+	private Flux<String> fetchProductNamesInBatch(final List<TradeRecord> batch) {
+		final List<String> productIds = batch.stream().map(trade -> String.valueOf(trade.productId())).toList();
 		final List<String> productNames = productService.getProductNamesInBatch(productIds);
 
+		return mapTradesToCsv(batch, productNames);
+	}
+
+	private Flux<String> mapTradesToCsv(final List<TradeRecord> batch, final List<String> productNames) {
 		return Flux.fromIterable(batch)
 			.parallel()
 			.runOn(Schedulers.parallel())
-			.map(trade -> {
-				String productName = productNames.get(batch.indexOf(trade));
-				return trade.date() + "," + productName + "," + trade.currency() + "," + trade.price() + System.lineSeparator();
-			})
+			.map(trade -> formatTradeRecord(trade, productNames.get(batch.indexOf(trade))))
 			.sequential();
+	}
+
+	private String formatTradeRecord(final TradeRecord trade, final String productName) {
+		return trade.date() + "," + productName + "," + trade.currency() + "," + trade.price() + System.lineSeparator();
 	}
 
 	private boolean isValidDate(final String dateStr) {
 		try {
 			LocalDate.parse(dateStr, DateTimeFormatter.ofPattern(DATE_TIME_FORMAT));
-
 			return true;
 		} catch (final DateTimeParseException e) {
 			return false;
