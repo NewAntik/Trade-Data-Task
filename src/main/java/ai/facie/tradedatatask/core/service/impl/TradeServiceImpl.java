@@ -33,16 +33,6 @@ public class TradeServiceImpl implements TradeService {
 
 	private final ProductService productService;
 
-	/**
-	 * Processes trade records reactively using multi-threading.
-	 *
-	 * <p>Reads the file line-by-line, validates trade data, enriches it in parallel,
-	 * and streams the results.</p>
-	 *
-	 * @param stream The input stream containing trade data.
-	 *
-	 * @return A {@link Flux} that emits enriched trade records as a stream.
-	 */
 	@Override
 	@SneakyThrows
 	public Flux<String> enrichTradesStream(final InputStream stream) {
@@ -69,12 +59,6 @@ public class TradeServiceImpl implements TradeService {
 		);
 	}
 
-	/**
-	 * Parses a trade CSV line and extracts the trade details.
-	 *
-	 * @param line A single line from the trade CSV.
-	 * @return A parsed TradeRecord or null if invalid.
-	 */
 	private TradeRecord parseTrade(final String line) {
 		final String[] parts = CSV_SPLIT_PATTERN.split(line);
 
@@ -90,14 +74,6 @@ public class TradeServiceImpl implements TradeService {
 		return null;
 	}
 
-	/**
-	 * Fetches product names in batch from Redis, reducing the number of calls.
-	 *
-	 * <p>Formats each trade record with a newline separator in parallel before returning.</p>
-	 *
-	 * @param batch List of trade records.
-	 * @return Flux<String> containing enriched trade records with newlines.
-	 */
 	private Flux<String> fetchProductNamesInBatch(final List<TradeRecord> batch) {
 		final List<String> productIds = batch.stream()
 			.map(trade -> String.valueOf(trade.productId()))
@@ -115,13 +91,6 @@ public class TradeServiceImpl implements TradeService {
 			.sequential();
 	}
 
-	/**
-	 * Validates whether the given date string is in the expected format ({@code yyyyMMdd}).
-	 *
-	 * @param dateStr The date string to validate.
-	 *
-	 * @return {@code true} if the date format is valid, otherwise {@code false}.
-	 */
 	private boolean isValidDate(final String dateStr) {
 		try {
 			LocalDate.parse(dateStr, DateTimeFormatter.ofPattern(DATE_TIME_FORMAT));
@@ -132,8 +101,5 @@ public class TradeServiceImpl implements TradeService {
 		}
 	}
 
-	/**
-	 * Represents a parsed trade record.
-	 */
-	private record TradeRecord(String date, Long productId, String currency, String price) {}
+	record TradeRecord(String date, Long productId, String currency, String price) {}
 }

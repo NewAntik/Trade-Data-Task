@@ -11,24 +11,13 @@ import reactor.test.StepVerifier;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.util.List;
 
-import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TradeServiceImplTest {
-	private static final Long FIRST_ID = 1L;
-	private static final Long SECOND_ID = 2L;
-	public static final String TREASURY_BILLS_DOMESTIC = "Treasury Bills Domestic";
-	public static final String CORPORATE_BONDS_DOMESTIC = "Corporate Bonds Domestic";
-
-	private static final String VALID_CSV = "date,productId,currency,price\n" +
-		"20230101,1,USD,100.25\n" +
-		"20230102,2,EUR,200.45\n";
-
-	private static final String INVALID_CSV = "date,productId,currency,price\n" +
-		"INVALID_DATE,1,USD,100.25\n" +
-		"20230103,INVALID_ID,EUR,300.50\n";
 
 	@Mock
 	private ProductService productService;
@@ -36,68 +25,64 @@ class TradeServiceImplTest {
 	@InjectMocks
 	private TradeServiceImpl tradeService;
 
-	/**
-	 * est case: Successfully processes valid trade records.
-	 * Expected: Each trade is enriched with a product name.
-	 */
-	@Test
-	void testEnrichTradesStream_Success() {
-		final InputStream stream = new ByteArrayInputStream(VALID_CSV.getBytes());
-		final Flux<String> result = tradeService.enrichTradesStream(stream);
+	private static final String VALID_CSV = "date,productName,currency,price\n" +
+		"20240101,123,USD,100.50\n" +
+		"20240102,456,EUR,200.75\n";
 
-		when(productService.getProductName(FIRST_ID)).thenReturn(TREASURY_BILLS_DOMESTIC);
-		when(productService.getProductName(SECOND_ID)).thenReturn(CORPORATE_BONDS_DOMESTIC);
+	private static final String INVALID_CSV = "date,productName,currency,price\n" +
+		"invalidDate,123,USD,100.50\n" +
+		"20240102,invalidId,EUR,200.75\n";
+
+	@Test
+	void testEnrichTradesStream_WithValidData() {
+		InputStream inputStream = new ByteArrayInputStream(VALID_CSV.getBytes());
+		Flux<String> result = tradeService.enrichTradesStream(inputStream);
+
+		when(productService.getProductNamesInBatch(anyList())).thenAnswer(invocation -> {
+			List<String> productIds = invocation.getArgument(0);
+			return productIds.stream().map(id -> "Product" + id).toList();
+		});
 
 		StepVerifier.create(result)
-			.expectNext("20230102,Corporate Bonds Domestic,EUR,200.45")
-			.expectNext("20230101,Treasury Bills Domestic,USD,100.25")
+			.expectNext("date,productName,currency,price\n")
+			.expectNext("20240101,Product123,USD,100.50\n")
+			.expectNext("20240102,Product456,EUR,200.75\n")
 			.verifyComplete();
 	}
 
-	/**
-	 * Test case: Skips invalid trade records.
-	 * Expected: Invalid records should be filtered out.
-	 */
 	@Test
-	void testEnrichTradesStream_WithInvalidRecords() {
-		final InputStream stream = new ByteArrayInputStream(INVALID_CSV.getBytes());
-		final Flux<String> result = tradeService.enrichTradesStream(stream);
-
-		StepVerifier.create(result).verifyComplete();
-	}
-
-	/**
-	 * Test case: Processes a large input stream efficiently.
-	 * Expected: Should complete processing without memory issues.
-	 */
-	@Test
-	void testEnrichTradesStream_LargeFile() {
-		final StringBuilder largeCsv = getLargeFile();
-
-		mockAllProducts();
-
-		final InputStream stream = new ByteArrayInputStream(largeCsv.toString().getBytes());
-		final Flux<String> result = tradeService.enrichTradesStream(stream);
+	void testEnrichTradesStream_WithInvalidData() {
+		InputStream inputStream = new ByteArrayInputStream(INVALID_CSV.getBytes());
+		Flux<String> result = tradeService.enrichTradesStream(inputStream);
 
 		StepVerifier.create(result)
-			.expectNextCount(10000)
+			.expectNext("date,productName,currency,price\n")
 			.verifyComplete();
 	}
 
-	private void mockAllProducts(){
-		for (long id = 1; id <= 5; id++) {
-			lenient().when(productService.getProductName(id))
-				.thenReturn(id % 2 == 0 ? CORPORATE_BONDS_DOMESTIC : TREASURY_BILLS_DOMESTIC);
-		}
+	@Test
+	void testEnrichTradesStream_EmptyInput() {
+		InputStream inputStream = new ByteArrayInputStream("date,productName,currency,price\n".getBytes());
+		Flux<String> result = tradeService.enrichTradesStream(inputStream);
+
+		StepVerifier.create(result)
+			.expectNext("date,productName,currency,price\n") // Expect header
+			.expectNextCount(0) // Expect no additional data
+			.verifyComplete();
 	}
 
-	private StringBuilder getLargeFile(){
-		final StringBuilder largeCsv = new StringBuilder("date,productId,currency,price\n");
-		for (int i = 1; i <= 10000; i++) {
-			largeCsv.append("202301").append(String.format("%02d", i % 30 + 1)).append(",")
-				.append(i % 5 + 1).append(",USD,").append(100.0 + i).append("\n");
+	@Test
+	void testEnrichTradesStream_WithLargeBatch() {
+		StringBuilder csvBuilder = new StringBuilder("date,productName,currency,price\n");
+		for (int i = 0; i < 1500; i++) {
+			csvBuilder.append("20240101,").append(i).append(",USD,100.50\n");
 		}
+		InputStream inputStream = new ByteArrayInputStream(csvBuilder.toString().getBytes());
+		Flux<String> result = tradeService.enrichTradesStream(inputStream);
 
-		return largeCsv;
+		StepVerifier.create(result)
+			.expectNext("date,productName,currency,price\n")
+			.expectNextCount(1500)
+			.verifyComplete();
 	}
 }
