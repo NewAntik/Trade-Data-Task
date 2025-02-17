@@ -25,10 +25,10 @@ import java.util.regex.Pattern;
 @AllArgsConstructor
 public class TradeServiceImpl implements TradeService {
 	private static final int START_LINE = 1;
-	private static final String DATE_TIME_FORMAT = "yyyyMMdd";
-	private static final String SKIPPING_MESSAGE = "Skipping invalid trade record: {}";
-	private static final Pattern CSV_SPLIT_PATTERN = Pattern.compile(",");
 	private static final int BATCH_SIZE = 1000;
+	private static final String DATE_TIME_FORMAT = "yyyyMMdd";
+	private static final Pattern CSV_SPLIT_PATTERN = Pattern.compile(",");
+	private static final String SKIPPING_MESSAGE = "Skipping invalid trade record: {}";
 	public static final String TABLE_HEADER = "date,productName,currency,price\n";
 
 	private final ProductService productService;
@@ -97,10 +97,10 @@ public class TradeServiceImpl implements TradeService {
 		final List<String> productIds = batch.stream().map(trade -> String.valueOf(trade.productId())).toList();
 		final List<String> productNames = productService.getProductNamesInBatch(productIds);
 
-		return mapTradesToCsv(batch, productNames);
+		return mapTradesToTable(batch, productNames);
 	}
 
-	private Flux<String> mapTradesToCsv(final List<TradeRecord> batch, final List<String> productNames) {
+	private Flux<String> mapTradesToTable(final List<TradeRecord> batch, final List<String> productNames) {
 		return Flux.fromIterable(batch)
 			.parallel()
 			.runOn(Schedulers.parallel())
