@@ -1,6 +1,7 @@
 package ai.facie.tradedatatask.core.service.impl;
 
 import ai.facie.tradedatatask.core.service.ProductService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -13,11 +14,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TradeServiceImplTest {
@@ -33,12 +30,16 @@ class TradeServiceImplTest {
 	@Test
 	void testEnrichTradesStream_ValidData() {
 		final InputStream inputStream = new ByteArrayInputStream(VALID_CSV.getBytes());
-		when(productService.getProductNamesInBatch(anyList()))
+		when(productService.getProductNamesInBatch(List.of("123", "124")))
 			.thenReturn(List.of("Product A", "Product B"));
 
-		final List<String> result = tradeService.enrichTradesStream(inputStream).collectList().block();
+		final Flux<String> result = tradeService.enrichTradesStream(inputStream);
 
-		assertFalse(result.isEmpty());
+		StepVerifier.create(result)
+			.expectNext(TradeServiceImpl.TABLE_HEADER)
+			.expectNext("20240101,Product A,USD,100\n")
+			.expectNext("20240102,Product B,EUR,200\n")
+			.verifyComplete();
 	}
 
 	@Test

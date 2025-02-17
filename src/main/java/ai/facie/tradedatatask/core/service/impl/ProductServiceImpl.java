@@ -66,11 +66,8 @@ public class ProductServiceImpl implements ProductService {
 	 */
 	private void processProductStream(final BufferedReader reader) {
 		Flux.fromStream(reader.lines().skip(START_LINE))
-			.parallel()
-			.runOn(Schedulers.boundedElastic())
 			.map(this::parseProduct)
 			.filter(Objects::nonNull)
-			.sequential()
 			.buffer(BATCH_SIZE)
 			.doOnNext(this::batchInsertToRedis)
 			.blockLast();

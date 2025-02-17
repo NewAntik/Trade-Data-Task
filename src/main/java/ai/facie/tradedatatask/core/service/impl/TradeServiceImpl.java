@@ -17,8 +17,10 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -67,11 +69,8 @@ public class TradeServiceImpl implements TradeService {
 	 */
 	private Flux<String> processTradeStream(final BufferedReader reader) {
 		return Flux.fromStream(reader.lines().skip(START_LINE))
-			.parallel()
-			.runOn(Schedulers.boundedElastic())
 			.map(this::parseTrade)
 			.filter(Objects::nonNull)
-			.sequential()
 			.buffer(BATCH_SIZE)
 			.flatMap(this::fetchProductNamesInBatch)
 			.startWith(TABLE_HEADER);
@@ -155,11 +154,11 @@ public class TradeServiceImpl implements TradeService {
 	 * @return A Flux stream of formatted trade records.
 	 */
 	private Flux<String> mapTradesToTable(final List<TradeRecord> batch, final List<String> productNames) {
+		final Map<Long, String> tradeProductMap = batch.stream()
+			.collect(Collectors.toMap(TradeRecord::productId, trade -> productNames.get(batch.indexOf(trade)), (a, b) -> a));
+
 		return Flux.fromIterable(batch)
-			.parallel()
-			.runOn(Schedulers.parallel())
-			.map(trade -> formatTradeRecord(trade, productNames.get(batch.indexOf(trade))))
-			.sequential();
+			.map(trade -> formatTradeRecord(trade, tradeProductMap.getOrDefault(trade.productId(), "UNKNOWN_PRODUCT")));
 	}
 
 	/**
