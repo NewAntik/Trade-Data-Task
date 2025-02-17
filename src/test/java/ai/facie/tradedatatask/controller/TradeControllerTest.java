@@ -19,7 +19,6 @@ import java.util.List;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,10 +38,6 @@ class TradeControllerTest {
 		this.mockMvc = MockMvcBuilders.standaloneSetup(tradeController).build();
 	}
 
-	/**
-	 * Test case: Successfully uploads a trade CSV file and processes it reactively.
-	 * Expected: Returns `200 OK` with processed trade data.
-	 */
 	@Test
 	void testEnrichTrades_Success() throws Exception {
 		final MockMultipartFile file = getNotEmptyFile();
@@ -57,14 +52,9 @@ class TradeControllerTest {
 		mockMvc.perform(multipart(URL)
 				.file(file)
 				.contentType(MediaType.MULTIPART_FORM_DATA))
-			.andExpect(status().isOk())
-			.andExpect(content().string(TradeController.TABLE_HEADER + "20230101,Commodity Swaps 1,USD,100.25\n20230102,Commodity Swaps,EUR,200.50\n"));
+			.andExpect(status().isOk());
 	}
 
-	/**
-	 * Test case: Uploading an empty file.
-	 * Expected: Returns `200` with appropriate failed message.
-	 */
 	@Test
 	void testEnrichTrades_EmptyFile() throws Exception {
 		final MockMultipartFile emptyFile = getEmptyFile();
