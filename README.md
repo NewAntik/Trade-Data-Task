@@ -14,9 +14,7 @@ So for using this application follow these steps:
 
 
 I've tested the program using product.csv file(2,2 MB) and trade.csv file(4,2mb)
-As results:
-1. upload the product file - 478 ms.
-2. process the trade file - 1440 ms(first try), 1001 ms(second try), 953ms(third try).
+As results: https://drive.google.com/drive/folders/1yB8g_m2twytaYDqZUmEKjbxrvsWL8iU4?usp=sharing
 
 
 Thank you for your time!
