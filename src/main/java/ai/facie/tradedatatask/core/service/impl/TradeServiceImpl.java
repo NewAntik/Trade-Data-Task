@@ -33,6 +33,12 @@ public class TradeServiceImpl implements TradeService {
 
 	private final ProductService productService;
 
+	/**
+	 * Enriches trade data from an input stream.
+	 *
+	 * @param stream Input stream containing trade data.
+	 * @return A Flux stream of processed trade records.
+	 */
 	@Override
 	@SneakyThrows
 	public Flux<String> enrichTradesStream(final InputStream stream) {
@@ -43,10 +49,22 @@ public class TradeServiceImpl implements TradeService {
 		);
 	}
 
+	/**
+	 * Creates a buffered reader for reading the input stream.
+	 *
+	 * @param stream Input stream.
+	 * @return BufferedReader instance.
+	 */
 	private BufferedReader createBufferedReader(final InputStream stream) {
 		return new BufferedReader(new InputStreamReader(stream));
 	}
 
+	/**
+	 * Processes the trade data stream, parses and enriches trade records.
+	 *
+	 * @param reader BufferedReader for reading the trade data.
+	 * @return A Flux stream of formatted trade records.
+	 */
 	private Flux<String> processTradeStream(final BufferedReader reader) {
 		return Flux.fromStream(reader.lines().skip(START_LINE))
 			.parallel()
@@ -59,6 +77,11 @@ public class TradeServiceImpl implements TradeService {
 			.startWith(TABLE_HEADER);
 	}
 
+	/**
+	 * Closes the BufferedReader instance safely.
+	 *
+	 * @param reader BufferedReader instance to close.
+	 */
 	private void closeBufferedReader(final BufferedReader reader) {
 		Schedulers.boundedElastic().schedule(() -> {
 			try {
@@ -69,6 +92,12 @@ public class TradeServiceImpl implements TradeService {
 		});
 	}
 
+	/**
+	 * Parses a single trade record line into a TradeRecord object.
+	 *
+	 * @param line A line from the input data.
+	 * @return A parsed TradeRecord object or null if invalid.
+	 */
 	private TradeRecord parseTrade(final String line) {
 		final String[] parts = CSV_SPLIT_PATTERN.split(line);
 		if (isValidTradeRecord(parts)) {
@@ -79,10 +108,22 @@ public class TradeServiceImpl implements TradeService {
 		return null;
 	}
 
+	/**
+	 * Validates a trade record based on the expected data format.
+	 *
+	 * @param parts Array of trade record fields.
+	 * @return true if the trade record is valid, otherwise false.
+	 */
 	private boolean isValidTradeRecord(final String[] parts) {
 		return parts.length == 4 && isValidDate(parts[0]);
 	}
 
+	/**
+	 * Creates a TradeRecord object from parsed fields.
+	 *
+	 * @param parts Array of trade record fields.
+	 * @return A TradeRecord object or null if parsing fails.
+	 */
 	private TradeRecord createTradeRecord(final String[] parts) {
 		try {
 			return new TradeRecord(parts[0], Long.parseLong(parts[1]), parts[2], parts[3]);
@@ -93,6 +134,12 @@ public class TradeServiceImpl implements TradeService {
 		}
 	}
 
+	/**
+	 * Fetches product names for a batch of trade records.
+	 *
+	 * @param batch List of TradeRecord objects.
+	 * @return A Flux stream of formatted trade records with enriched product names.
+	 */
 	private Flux<String> fetchProductNamesInBatch(final List<TradeRecord> batch) {
 		final List<String> productIds = batch.stream().map(trade -> String.valueOf(trade.productId())).toList();
 		final List<String> productNames = productService.getProductNamesInBatch(productIds);
@@ -100,6 +147,13 @@ public class TradeServiceImpl implements TradeService {
 		return mapTradesToTable(batch, productNames);
 	}
 
+	/**
+	 * Maps trade records to a formatted output including product names.
+	 *
+	 * @param batch List of TradeRecord objects.
+	 * @param productNames List of product names corresponding to the batch.
+	 * @return A Flux stream of formatted trade records.
+	 */
 	private Flux<String> mapTradesToTable(final List<TradeRecord> batch, final List<String> productNames) {
 		return Flux.fromIterable(batch)
 			.parallel()
@@ -108,10 +162,23 @@ public class TradeServiceImpl implements TradeService {
 			.sequential();
 	}
 
+	/**
+	 * Formats a trade record into a structured output line.
+	 *
+	 * @param trade TradeRecord object.
+	 * @param productName Enriched product name.
+	 * @return A formatted trade record string.
+	 */
 	private String formatTradeRecord(final TradeRecord trade, final String productName) {
 		return trade.date() + "," + productName + "," + trade.currency() + "," + trade.price() + System.lineSeparator();
 	}
 
+	/**
+	 * Validates if a given date string matches the expected format.
+	 *
+	 * @param dateStr Date string to validate.
+	 * @return true if the date is valid, otherwise false.
+	 */
 	private boolean isValidDate(final String dateStr) {
 		try {
 			LocalDate.parse(dateStr, DateTimeFormatter.ofPattern(DATE_TIME_FORMAT));
@@ -121,5 +188,8 @@ public class TradeServiceImpl implements TradeService {
 		}
 	}
 
+	/**
+	 * Represents a trade record with essential fields.
+	 */
 	record TradeRecord(String date, Long productId, String currency, String price) {}
 }
