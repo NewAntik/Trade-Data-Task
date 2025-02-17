@@ -39,6 +39,7 @@ public class ProductController {
 		if (file.isEmpty()) {
 			return ResponseEntity.badRequest().body("Upload failed: The file is empty.");
 		}
+
 		final Instant start = Instant.now();
 		productService.loadProductsFromStream(file.getInputStream());
 		final Instant end = Instant.now();
